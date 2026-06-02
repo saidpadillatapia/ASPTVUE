@@ -6,7 +6,16 @@
         <strong>Chat en Vivo</strong>
         <span class="user-info">— {{ currentUser?.name }}</span>
       </div>
-      <button @click="logout" class="btn-logout">Cerrar sesión</button>
+      <div class="header-actions">
+        <!-- Botón de notificaciones con Transition en el badge -->
+        <button @click="goToNotifications" class="btn-notif">
+          🔔
+          <Transition name="bounce">
+            <span v-if="unreadCount > 0" :key="unreadCount" class="badge">{{ unreadCount }}</span>
+          </Transition>
+        </button>
+        <button @click="logout" class="btn-logout">Cerrar sesión</button>
+      </div>
     </div>
 
     <!-- Mensajes -->
@@ -28,7 +37,7 @@
       </div>
     </div>
 
-    <!-- Input -->
+    <!-- Input con Transition en el botón enviar -->
     <div class="input-bar">
       <input
         v-model="newMessage"
@@ -36,8 +45,18 @@
         placeholder="Escribe un mensaje..."
         :disabled="sending"
       />
-      <button @click="sendMessage" :disabled="!newMessage.trim() || sending">Enviar</button>
+      <button @click="sendMessage" :disabled="!newMessage.trim() || sending" class="btn-send">
+        <Transition name="fade" mode="out-in">
+          <span v-if="sending" key="sending">⏳</span>
+          <span v-else key="send">Enviar</span>
+        </Transition>
+      </button>
     </div>
+
+    <!-- Alerta con Transition para confirmación de envío -->
+    <Transition name="slide-up">
+      <div v-if="alertMsg" class="toast">{{ alertMsg }}</div>
+    </Transition>
   </div>
 </template>
 
@@ -54,7 +73,10 @@ const loading = ref(true)
 const sending = ref(false)
 const messagesContainer = ref(null)
 const currentUser = ref(null)
+const unreadCount = ref(0)
+const alertMsg = ref('')
 let echoChannel = null
+let notifChannel = null
 
 const getUser = () => {
   const s = localStorage.getItem('user')
@@ -73,6 +95,11 @@ const formatTime = (d) => {
   return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 }
 
+const showToast = (msg) => {
+  alertMsg.value = msg
+  setTimeout(() => { alertMsg.value = '' }, 2000)
+}
+
 const loadMessages = async () => {
   try {
     const res = await api.get('/messages')
@@ -88,6 +115,13 @@ const loadMessages = async () => {
   }
 }
 
+const loadUnreadCount = async () => {
+  try {
+    const res = await api.get('/notifications/unread-count')
+    unreadCount.value = res.data.count
+  } catch (e) {}
+}
+
 const sendMessage = async () => {
   if (!newMessage.value.trim() || sending.value) return
   sending.value = true
@@ -97,8 +131,10 @@ const sendMessage = async () => {
     const res = await api.post('/messages', { message: text })
     messages.value.push(res.data)
     scrollToBottom()
+    showToast('Mensaje enviado ✓')
   } catch (err) {
     newMessage.value = text
+    showToast('Error al enviar ✗')
     if (err.response?.status === 401) {
       localStorage.removeItem('user')
       router.push('/login')
@@ -106,6 +142,10 @@ const sendMessage = async () => {
   } finally {
     sending.value = false
   }
+}
+
+const goToNotifications = () => {
+  router.push('/notifications')
 }
 
 const logout = async () => {
@@ -117,7 +157,11 @@ const logout = async () => {
 onMounted(() => {
   currentUser.value = getUser()
   if (!currentUser.value) { router.push('/login'); return }
+
   loadMessages()
+  loadUnreadCount()
+
+  // Escuchar mensajes del chat
   echoChannel = echo.channel('chat')
   echoChannel.listen('MessageSent', (data) => {
     if (!messages.value.find(m => m.id === data.id)) {
@@ -125,9 +169,18 @@ onMounted(() => {
       scrollToBottom()
     }
   })
+
+  // Escuchar notificaciones en tiempo real
+  notifChannel = echo.channel('notifications.' + currentUser.value.id)
+  notifChannel.listen('NotificationCreated', () => {
+    unreadCount.value++
+  })
 })
 
-onUnmounted(() => { if (echoChannel) echo.leave('chat') })
+onUnmounted(() => {
+  if (echoChannel) echo.leave('chat')
+  if (notifChannel) echo.leave('notifications.' + currentUser.value?.id)
+})
 </script>
 
 <style scoped>
@@ -140,6 +193,7 @@ onUnmounted(() => { if (echoChannel) echo.leave('chat') })
   background: #fff;
   border-left: 1px solid #ddd;
   border-right: 1px solid #ddd;
+  position: relative;
 }
 
 .header {
@@ -151,9 +205,60 @@ onUnmounted(() => { if (echoChannel) echo.leave('chat') })
   background: #f8f8f8;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .user-info {
   color: #666;
   font-size: 13px;
+}
+
+.btn-notif {
+  position: relative;
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.btn-notif:hover {
+  background: #f0f0f0;
+}
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #e00;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Transición bounce para el badge de notificaciones */
+.bounce-enter-active {
+  animation: bounce-in 0.4s;
+}
+
+.bounce-leave-active {
+  animation: bounce-in 0.3s reverse;
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 
 .btn-logout {
@@ -252,7 +357,7 @@ onUnmounted(() => { if (echoChannel) echo.leave('chat') })
   border-color: #4a90d9;
 }
 
-.input-bar button {
+.btn-send {
   padding: 9px 16px;
   background: #4a90d9;
   color: white;
@@ -260,10 +365,52 @@ onUnmounted(() => { if (echoChannel) echo.leave('chat') })
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+  min-width: 70px;
 }
 
-.input-bar button:disabled {
+.btn-send:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Transición fade para el texto del botón enviar */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+/* Toast de confirmación */
+.toast {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+/* Transición slide-up para el toast */
+.slide-up-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-up-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.slide-up-enter-from {
+  transform: translate(-50%, 20px);
+  opacity: 0;
+}
+
+.slide-up-leave-to {
+  transform: translate(-50%, -10px);
+  opacity: 0;
 }
 </style>
