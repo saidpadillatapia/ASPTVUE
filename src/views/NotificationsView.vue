@@ -6,45 +6,28 @@
     </div>
 
     <div class="notif-list">
-      <Transition name="fade">
-        <div v-if="loading" class="center-text">Cargando notificaciones...</div>
-      </Transition>
+      <div v-if="loading" class="center-text">Cargando...</div>
 
       <div v-if="!loading && notifications.length === 0" class="center-text">
         No tienes notificaciones
       </div>
 
-      <TransitionGroup name="list" tag="div">
-        <div
-          v-for="notif in notifications"
-          :key="notif.id"
-          class="notif-item"
-          :class="{ unread: !notif.read }"
-          @click="openDetail(notif)"
-        >
-          <div class="notif-icon">{{ getIcon(notif.type) }}</div>
-          <div class="notif-content">
-            <p class="notif-title">{{ notif.title }}</p>
-            <p class="notif-desc">{{ notif.description }}</p>
-            <span class="notif-time">{{ formatTime(notif.created_at) }}</span>
-          </div>
-          <span v-if="!notif.read" class="dot-unread"></span>
+      <div
+        v-for="notif in notifications"
+        :key="notif.id"
+        class="notif-item"
+        :class="{ unread: !notif.read }"
+        @click="openDetail(notif)"
+      >
+        <div class="notif-icon">{{ getIcon(notif.type) }}</div>
+        <div class="notif-content">
+          <p class="notif-title">{{ notif.title }}</p>
+          <p class="notif-desc">{{ notif.description }}</p>
+          <span class="notif-time">{{ formatTime(notif.created_at) }}</span>
         </div>
-      </TransitionGroup>
-    </div>
-
-    <!-- Detalle de notificación con Transition -->
-    <Transition name="slide-fade">
-      <div v-if="selectedNotif" class="notif-detail-overlay" @click.self="closeDetail">
-        <div class="notif-detail">
-          <h3>{{ selectedNotif.title }}</h3>
-          <p class="detail-type">Tipo: {{ translateType(selectedNotif.type) }}</p>
-          <p class="detail-desc">{{ selectedNotif.description }}</p>
-          <p class="detail-time">{{ formatDate(selectedNotif.created_at) }}</p>
-          <button @click="closeDetail" class="btn-close">Cerrar</button>
-        </div>
+        <span v-if="!notif.read" class="dot-unread"></span>
       </div>
-    </Transition>
+    </div>
   </div>
 </template>
 
@@ -57,7 +40,6 @@ import echo from '../echo'
 const router = useRouter()
 const notifications = ref([])
 const loading = ref(true)
-const selectedNotif = ref(null)
 let notifChannel = null
 
 const getUser = () => {
@@ -75,27 +57,9 @@ const getIcon = (type) => {
   }
 }
 
-const translateType = (type) => {
-  switch (type) {
-    case 'mensaje': return 'Mensaje'
-    case 'multa': return 'Multa'
-    case 'asamblea': return 'Asamblea'
-    case 'pago_atrasado': return 'Pago atrasado'
-    default: return type
-  }
-}
-
 const formatTime = (d) => {
   if (!d) return ''
   return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-}
-
-const formatDate = (d) => {
-  if (!d) return ''
-  return new Date(d).toLocaleString('es-MX', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  })
 }
 
 const loadNotifications = async () => {
@@ -112,18 +76,8 @@ const loadNotifications = async () => {
   }
 }
 
-const openDetail = async (notif) => {
-  selectedNotif.value = notif
-  if (!notif.read) {
-    try {
-      await api.post('/notifications/' + notif.id + '/read')
-      notif.read = true
-    } catch (e) {}
-  }
-}
-
-const closeDetail = () => {
-  selectedNotif.value = null
+const openDetail = (notif) => {
+  router.push('/notifications/' + notif.id)
 }
 
 const goBack = () => {
@@ -179,13 +133,9 @@ onUnmounted(() => {
   padding: 0;
 }
 
-.btn-back:hover {
-  text-decoration: underline;
-}
+.btn-back:hover { text-decoration: underline; }
 
-.notif-list {
-  padding: 12px;
-}
+.notif-list { padding: 12px; }
 
 .center-text {
   text-align: center;
@@ -203,22 +153,15 @@ onUnmounted(() => {
   border-radius: 6px;
 }
 
-.notif-item:hover {
-  background: #f5f5f5;
-}
-
-.notif-item.unread {
-  background: #f0f7ff;
-}
+.notif-item:hover { background: #f5f5f5; }
+.notif-item.unread { background: #f0f7ff; }
 
 .notif-icon {
   font-size: 24px;
   flex-shrink: 0;
 }
 
-.notif-content {
-  flex: 1;
-}
+.notif-content { flex: 1; }
 
 .notif-title {
   font-size: 14px;
@@ -243,108 +186,5 @@ onUnmounted(() => {
   background: #4a90d9;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-/* TransitionGroup para la lista */
-.list-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.list-leave-active {
-  transition: all 0.2s ease-in;
-}
-
-.list-enter-from {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.list-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
-/* Fade */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
-
-/* Detalle overlay */
-.notif-detail-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.notif-detail {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 360px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-}
-
-.notif-detail h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.detail-type {
-  font-size: 12px;
-  color: #4a90d9;
-  margin: 0 0 8px;
-}
-
-.detail-desc {
-  font-size: 14px;
-  color: #333;
-  margin: 0 0 8px;
-}
-
-.detail-time {
-  font-size: 12px;
-  color: #999;
-  margin: 0 0 16px;
-}
-
-.btn-close {
-  padding: 8px 16px;
-  background: #4a90d9;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-/* Slide-fade para el modal */
-.slide-fade-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.slide-fade-leave-active {
-  transition: all 0.2s ease-in;
-}
-
-.slide-fade-enter-from {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
 }
 </style>

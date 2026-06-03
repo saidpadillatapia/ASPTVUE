@@ -5,18 +5,47 @@
       <div>
         <strong>Chat en Vivo</strong>
         <span class="user-info">— {{ currentUser?.name }}</span>
+        <span v-if="currentUser?.role === 'admin'" class="admin-badge">ADMIN</span>
       </div>
       <div class="header-actions">
-        <!-- Botón de notificaciones con Transition en el badge -->
         <button @click="goToNotifications" class="btn-notif">
           🔔
           <Transition name="bounce">
             <span v-if="unreadCount > 0" :key="unreadCount" class="badge">{{ unreadCount }}</span>
           </Transition>
         </button>
-        <button @click="logout" class="btn-logout">Cerrar sesión</button>
+        <button v-if="currentUser?.role === 'admin'" @click="showAdminPanel = !showAdminPanel" class="btn-admin">
+          ⚙️ Multas
+        </button>
+        <button @click="logout" class="btn-logout">Salir</button>
       </div>
     </div>
+
+    <!-- Panel Admin para poner multas -->
+    <Transition name="slide-down">
+      <div v-if="showAdminPanel" class="admin-panel">
+        <h3>Aplicar multa / notificación</h3>
+        <div class="admin-form">
+          <select v-model="adminForm.user_id">
+            <option value="">Seleccionar usuario</option>
+            <option v-for="u in usersList" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+          <select v-model="adminForm.type">
+            <option value="multa">Multa</option>
+            <option value="asamblea">Asamblea</option>
+            <option value="pago_atrasado">Pago atrasado</option>
+          </select>
+          <input v-model="adminForm.title" placeholder="Título (ej: Multa por retraso)" />
+          <input v-model="adminForm.description" placeholder="Descripción" />
+          <button @click="sendNotification" :disabled="!adminForm.user_id || !adminForm.title || adminSending">
+            <Transition name="fade" mode="out-in">
+              <span v-if="adminSending" key="loading">⏳ Enviando...</span>
+              <span v-else key="normal">Enviar notificación</span>
+            </Transition>
+          </button>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Mensajes -->
     <div class="messages" ref="messagesContainer">
@@ -37,7 +66,7 @@
       </div>
     </div>
 
-    <!-- Input con Transition en el botón enviar -->
+    <!-- Input -->
     <div class="input-bar">
       <input
         v-model="newMessage"
@@ -47,15 +76,15 @@
       />
       <button @click="sendMessage" :disabled="!newMessage.trim() || sending" class="btn-send">
         <Transition name="fade" mode="out-in">
-          <span v-if="sending" key="sending">⏳</span>
-          <span v-else key="send">Enviar</span>
+          <span v-if="sending" key="loading">⏳</span>
+          <span v-else key="normal">Enviar</span>
         </Transition>
       </button>
     </div>
 
-    <!-- Alerta con Transition para confirmación de envío -->
-    <Transition name="slide-up">
-      <div v-if="alertMsg" class="toast">{{ alertMsg }}</div>
+    <!-- Alerta con transición -->
+    <Transition name="toast">
+      <div v-if="alertMsg" class="toast" :class="alertType">{{ alertMsg }}</div>
     </Transition>
   </div>
 </template>
@@ -74,7 +103,13 @@ const sending = ref(false)
 const messagesContainer = ref(null)
 const currentUser = ref(null)
 const unreadCount = ref(0)
+const showAdminPanel = ref(false)
+const usersList = ref([])
+const adminSending = ref(false)
+const adminForm = ref({ user_id: '', type: 'multa', title: '', description: '' })
 const alertMsg = ref('')
+const alertType = ref('success')
+
 let echoChannel = null
 let notifChannel = null
 
@@ -95,9 +130,10 @@ const formatTime = (d) => {
   return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 }
 
-const showToast = (msg) => {
+const showAlert = (msg, type = 'success') => {
   alertMsg.value = msg
-  setTimeout(() => { alertMsg.value = '' }, 2000)
+  alertType.value = type
+  setTimeout(() => { alertMsg.value = '' }, 3000)
 }
 
 const loadMessages = async () => {
@@ -122,6 +158,13 @@ const loadUnreadCount = async () => {
   } catch (e) {}
 }
 
+const loadUsers = async () => {
+  try {
+    const res = await api.get('/users')
+    usersList.value = res.data
+  } catch (e) {}
+}
+
 const sendMessage = async () => {
   if (!newMessage.value.trim() || sending.value) return
   sending.value = true
@@ -131,16 +174,34 @@ const sendMessage = async () => {
     const res = await api.post('/messages', { message: text })
     messages.value.push(res.data)
     scrollToBottom()
-    showToast('Mensaje enviado ✓')
+    showAlert('✓ Mensaje enviado', 'success')
   } catch (err) {
     newMessage.value = text
-    showToast('Error al enviar ✗')
+    showAlert('✗ Error al enviar mensaje', 'error')
     if (err.response?.status === 401) {
       localStorage.removeItem('user')
       router.push('/login')
     }
   } finally {
     sending.value = false
+  }
+}
+
+const sendNotification = async () => {
+  adminSending.value = true
+  try {
+    await api.post('/notifications', {
+      user_id: adminForm.value.user_id,
+      type: adminForm.value.type,
+      title: adminForm.value.title,
+      description: adminForm.value.description,
+    })
+    showAlert('✓ Notificación enviada correctamente', 'success')
+    adminForm.value = { user_id: '', type: 'multa', title: '', description: '' }
+  } catch (e) {
+    showAlert('✗ Error al enviar notificación', 'error')
+  } finally {
+    adminSending.value = false
   }
 }
 
@@ -161,7 +222,10 @@ onMounted(() => {
   loadMessages()
   loadUnreadCount()
 
-  // Escuchar mensajes del chat
+  if (currentUser.value.role === 'admin') {
+    loadUsers()
+  }
+
   echoChannel = echo.channel('chat')
   echoChannel.listen('MessageSent', (data) => {
     if (!messages.value.find(m => m.id === data.id)) {
@@ -170,7 +234,6 @@ onMounted(() => {
     }
   })
 
-  // Escuchar notificaciones en tiempo real
   notifChannel = echo.channel('notifications.' + currentUser.value.id)
   notifChannel.listen('NotificationCreated', () => {
     unreadCount.value++
@@ -216,6 +279,16 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
+.admin-badge {
+  background: #c00;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-weight: bold;
+}
+
 .btn-notif {
   position: relative;
   padding: 5px 10px;
@@ -226,9 +299,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.btn-notif:hover {
-  background: #f0f0f0;
-}
+.btn-notif:hover { background: #f0f0f0; }
 
 .badge {
   position: absolute;
@@ -246,20 +317,25 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-/* Transición bounce para el badge de notificaciones */
-.bounce-enter-active {
-  animation: bounce-in 0.4s;
-}
-
-.bounce-leave-active {
-  animation: bounce-in 0.3s reverse;
-}
-
+/* Transición bounce para el badge */
+.bounce-enter-active { animation: bounce-in 0.4s; }
+.bounce-leave-active { animation: bounce-in 0.3s reverse; }
 @keyframes bounce-in {
   0% { transform: scale(0); }
   50% { transform: scale(1.3); }
   100% { transform: scale(1); }
 }
+
+.btn-admin {
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-admin:hover { background: #f0f0f0; }
 
 .btn-logout {
   padding: 5px 12px;
@@ -271,10 +347,58 @@ onUnmounted(() => {
   color: #c00;
 }
 
-.btn-logout:hover {
-  background: #fee;
+.btn-logout:hover { background: #fee; }
+
+/* Transición slide-down para panel admin */
+.slide-down-enter-active { transition: all 0.3s ease-out; }
+.slide-down-leave-active { transition: all 0.2s ease-in; }
+.slide-down-enter-from { transform: translateY(-10px); opacity: 0; }
+.slide-down-leave-to { transform: translateY(-10px); opacity: 0; }
+
+/* Admin Panel */
+.admin-panel {
+  padding: 12px 16px;
+  background: #fffbe6;
+  border-bottom: 1px solid #e0d89a;
 }
 
+.admin-panel h3 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-form select,
+.admin-form input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.admin-form button {
+  padding: 8px;
+  background: #c00;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 34px;
+}
+
+.admin-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Transición fade para texto de botones */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* Messages */
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -291,13 +415,8 @@ onUnmounted(() => {
   margin-top: 40px;
 }
 
-.msg {
-  display: flex;
-}
-
-.msg.mine {
-  justify-content: flex-end;
-}
+.msg { display: flex; }
+.msg.mine { justify-content: flex-end; }
 
 .bubble {
   max-width: 70%;
@@ -320,9 +439,7 @@ onUnmounted(() => {
   margin-bottom: 2px;
 }
 
-.text {
-  word-wrap: break-word;
-}
+.text { word-wrap: break-word; }
 
 .time {
   display: block;
@@ -332,10 +449,9 @@ onUnmounted(() => {
   text-align: right;
 }
 
-.msg.mine .time {
-  color: rgba(255,255,255,0.7);
-}
+.msg.mine .time { color: rgba(255,255,255,0.7); }
 
+/* Input */
 .input-bar {
   display: flex;
   gap: 8px;
@@ -352,10 +468,7 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
-.input-bar input:focus {
-  outline: none;
-  border-color: #4a90d9;
-}
+.input-bar input:focus { outline: none; border-color: #4a90d9; }
 
 .btn-send {
   padding: 9px 16px;
@@ -368,49 +481,42 @@ onUnmounted(() => {
   min-width: 70px;
 }
 
-.btn-send:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Transición fade para el texto del botón enviar */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
-
-/* Toast de confirmación */
+/* Toast / Alerta con transición */
 .toast {
   position: absolute;
   bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 10px 20px;
+  border-radius: 6px;
   font-size: 13px;
+  font-weight: 500;
+  z-index: 50;
 }
 
-/* Transición slide-up para el toast */
-.slide-up-enter-active {
-  transition: all 0.3s ease-out;
+.toast.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
 }
 
-.slide-up-leave-active {
-  transition: all 0.3s ease-in;
+.toast.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
-.slide-up-enter-from {
-  transform: translate(-50%, 20px);
+/* Transición del toast */
+.toast-enter-active { transition: all 0.3s ease-out; }
+.toast-leave-active { transition: all 0.3s ease-in; }
+.toast-enter-from {
   opacity: 0;
+  transform: translateX(-50%) translateY(20px);
 }
-
-.slide-up-leave-to {
-  transform: translate(-50%, -10px);
+.toast-leave-to {
   opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
 }
 </style>

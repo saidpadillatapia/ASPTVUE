@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from './views/LoginView.vue'
 import ChatView from './views/ChatView.vue'
 import NotificationsView from './views/NotificationsView.vue'
+import NotificationDetailView from './views/NotificationDetailView.vue'
 
 const routes = [
     {
@@ -23,6 +24,11 @@ const routes = [
         name: 'Notifications',
         component: NotificationsView,
     },
+    {
+        path: '/notifications/:id',
+        name: 'NotificationDetail',
+        component: NotificationDetailView,
+    },
 ]
 
 const router = createRouter({
@@ -33,8 +39,8 @@ const router = createRouter({
 // Guard: si no hay usuario, redirigir a login
 router.beforeEach((to, from, next) => {
     const user = localStorage.getItem('user')
-    const protectedRoutes = ['Chat', 'Notifications']
-    if (protectedRoutes.includes(to.name) && !user) {
+    const publicRoutes = ['Login']
+    if (!publicRoutes.includes(to.name) && !user) {
         next({ name: 'Login' })
     } else if (to.name === 'Login' && user) {
         next({ name: 'Chat' })

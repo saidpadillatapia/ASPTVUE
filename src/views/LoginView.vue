@@ -15,69 +15,71 @@
           <input v-model="password" type="password" placeholder="••••••" required />
         </div>
 
-        <!-- Botón con Transition para estado cargando -->
+        <Transition name="fade">
+          <p v-if="error" class="error">{{ error }}</p>
+        </Transition>
+
         <button type="submit" :disabled="loading" class="btn-login">
           <Transition name="fade" mode="out-in">
-            <span v-if="loading" key="loading" class="loading-text">⏳ Cargando...</span>
-            <span v-else key="idle">Entrar</span>
+            <span v-if="loading" key="loading">⏳ Verificando...</span>
+            <span v-else key="normal">Entrar</span>
           </Transition>
         </button>
       </form>
 
-      <!-- Alerta con Transition para mostrar resultado -->
-      <Transition name="slide-fade">
-        <div v-if="alert.show" :class="['alert', alert.type]">
-          {{ alert.message }}
-        </div>
+      <!-- Alerta de resultado -->
+      <Transition name="slide-up">
+        <div v-if="alertMsg" class="alert" :class="alertType">{{ alertMsg }}</div>
       </Transition>
 
       <div class="hint">
         <p><b>Usuarios de prueba:</b></p>
+        <p>admin@test.com / 123456 (Admin)</p>
         <p>said@test.com / 123456</p>
-        <p>test@test.com / 123456</p>
+        <p>karol@test.com / 123456</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
 
 const router = useRouter()
 const email = ref('')
 const password = ref('')
+const error = ref('')
 const loading = ref(false)
+const alertMsg = ref('')
+const alertType = ref('success')
 
-const alert = reactive({
-  show: false,
-  message: '',
-  type: 'success' // 'success' o 'error'
-})
-
-const showAlert = (message, type = 'success') => {
-  alert.show = true
-  alert.message = message
-  alert.type = type
-  setTimeout(() => { alert.show = false }, 3000)
+const showAlert = (msg, type = 'success') => {
+  alertMsg.value = msg
+  alertType.value = type
+  setTimeout(() => { alertMsg.value = '' }, 3000)
 }
 
 const login = async () => {
+  error.value = ''
   loading.value = true
-  alert.show = false
-
   try {
     const res = await api.post('/login', {
       email: email.value,
       password: password.value,
     })
+    showAlert('✓ Bienvenido, ' + res.data.user.name, 'success')
     localStorage.setItem('user', JSON.stringify(res.data.user))
-    showAlert('Bienvenido, ' + res.data.user.name, 'success')
-    setTimeout(() => router.push('/chat'), 1000)
+    setTimeout(() => { router.push('/chat') }, 800)
   } catch (err) {
-    const msg = err.response?.status === 401 ? 'Credenciales incorrectas' : 'Error de conexión'
-    showAlert(msg, 'error')
+    if (err.response?.status === 401) {
+      error.value = 'Credenciales incorrectas'
+      showAlert('✗ Credenciales incorrectas', 'error')
+    } else {
+      error.value = 'Error de conexión'
+      showAlert('✗ Error de conexión con el servidor', 'error')
+    }
   } finally {
     loading.value = false
   }
@@ -99,6 +101,7 @@ const login = async () => {
   border-radius: 8px;
   width: 320px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  position: relative;
 }
 
 .login-box h2 {
@@ -136,7 +139,12 @@ const login = async () => {
   border-color: #4a90d9;
 }
 
-/* Botón de login */
+.error {
+  color: red;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
 .btn-login {
   width: 100%;
   padding: 10px;
@@ -146,7 +154,7 @@ const login = async () => {
   border-radius: 4px;
   font-size: 14px;
   cursor: pointer;
-  margin-top: 6px;
+  min-height: 40px;
 }
 
 .btn-login:hover:not(:disabled) {
@@ -154,62 +162,39 @@ const login = async () => {
 }
 
 .btn-login:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.loading-text {
-  display: inline-block;
-}
-
-/* Transición fade para el texto del botón */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
-
-/* Transición slide-fade para la alerta */
-.slide-fade-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.slide-fade-leave-active {
-  transition: all 0.3s ease-in;
-}
-
-.slide-fade-enter-from {
-  transform: translateY(-10px);
-  opacity: 0;
-}
-
-.slide-fade-leave-to {
-  transform: translateY(10px);
-  opacity: 0;
+  opacity: 0.6;
 }
 
 /* Alerta */
 .alert {
-  margin-top: 14px;
-  padding: 10px 12px;
+  margin-top: 12px;
+  padding: 10px;
   border-radius: 4px;
   font-size: 13px;
   text-align: center;
 }
 
 .alert.success {
-  background: #e6f9e6;
-  color: #1a7a1a;
-  border: 1px solid #b3e6b3;
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
 }
 
 .alert.error {
-  background: #fde8e8;
-  color: #c00;
-  border: 1px solid #f5c2c2;
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
+
+/* Transición fade */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* Transición slide-up para alerta */
+.slide-up-enter-active { transition: all 0.3s ease-out; }
+.slide-up-leave-active { transition: all 0.3s ease-in; }
+.slide-up-enter-from { opacity: 0; transform: translateY(10px); }
+.slide-up-leave-to { opacity: 0; transform: translateY(-10px); }
 
 .hint {
   margin-top: 18px;
