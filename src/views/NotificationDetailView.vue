@@ -73,6 +73,7 @@ onMounted(async () => {
   } catch (err) {
     if (err.response?.status === 401) {
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       router.push('/login')
     }
   } finally {

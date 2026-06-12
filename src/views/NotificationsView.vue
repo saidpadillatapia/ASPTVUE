@@ -69,6 +69,7 @@ const loadNotifications = async () => {
   } catch (e) {
     if (e.response?.status === 401) {
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       router.push('/login')
     }
   } finally {

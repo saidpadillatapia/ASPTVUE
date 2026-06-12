@@ -1,8 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from './views/LoginView.vue'
+import RegisterView from './views/RegisterView.vue'
+import VerifyEmailView from './views/VerifyEmailView.vue'
 import ChatView from './views/ChatView.vue'
 import NotificationsView from './views/NotificationsView.vue'
 import NotificationDetailView from './views/NotificationDetailView.vue'
+import UsersView from './views/UsersView.vue'
 
 const routes = [
     {
@@ -13,6 +16,16 @@ const routes = [
         path: '/login',
         name: 'Login',
         component: LoginView,
+    },
+    {
+        path: '/register',
+        name: 'Register',
+        component: RegisterView,
+    },
+    {
+        path: '/verify-email',
+        name: 'VerifyEmail',
+        component: VerifyEmailView,
     },
     {
         path: '/chat',
@@ -29,6 +42,11 @@ const routes = [
         name: 'NotificationDetail',
         component: NotificationDetailView,
     },
+    {
+        path: '/users',
+        name: 'Users',
+        component: UsersView,
+    },
 ]
 
 const router = createRouter({
@@ -36,13 +54,14 @@ const router = createRouter({
     routes,
 })
 
-// Guard: si no hay usuario, redirigir a login
+// Guard: si no hay token, redirigir a login (excepto rutas públicas)
 router.beforeEach((to, from, next) => {
-    const user = localStorage.getItem('user')
-    const publicRoutes = ['Login']
-    if (!publicRoutes.includes(to.name) && !user) {
+    const token = localStorage.getItem('token')
+    const publicRoutes = ['Login', 'Register', 'VerifyEmail']
+
+    if (!publicRoutes.includes(to.name) && !token) {
         next({ name: 'Login' })
-    } else if (to.name === 'Login' && user) {
+    } else if ((to.name === 'Login' || to.name === 'Register') && token) {
         next({ name: 'Chat' })
     } else {
         next()

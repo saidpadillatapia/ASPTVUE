@@ -14,6 +14,9 @@
             <span v-if="unreadCount > 0" :key="unreadCount" class="badge">{{ unreadCount }}</span>
           </Transition>
         </button>
+        <button v-if="currentUser?.role === 'admin'" @click="goToUsers" class="btn-admin">
+          👥 Usuarios
+        </button>
         <button v-if="currentUser?.role === 'admin'" @click="showAdminPanel = !showAdminPanel" class="btn-admin">
           ⚙️ Multas
         </button>
@@ -144,6 +147,7 @@ const loadMessages = async () => {
   } catch (err) {
     if (err.response?.status === 401) {
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       router.push('/login')
     }
   } finally {
@@ -180,6 +184,7 @@ const sendMessage = async () => {
     showAlert('✗ Error al enviar mensaje', 'error')
     if (err.response?.status === 401) {
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       router.push('/login')
     }
   } finally {
@@ -209,9 +214,14 @@ const goToNotifications = () => {
   router.push('/notifications')
 }
 
+const goToUsers = () => {
+  router.push('/users')
+}
+
 const logout = async () => {
   try { await api.post('/logout') } catch (e) {}
   localStorage.removeItem('user')
+  localStorage.removeItem('token')
   router.push('/login')
 }
 
