@@ -21,6 +21,7 @@
           ⚙️ Multas
         </button>
         <button @click="logout" class="btn-logout">Salir</button>
+        <button @click="goToChangePassword" class="btn-password" title="Cambiar contraseña">🔒</button>
       </div>
     </div>
 
@@ -218,6 +219,10 @@ const goToUsers = () => {
   router.push('/users')
 }
 
+const goToChangePassword = () => {
+  router.push('/change-password')
+}
+
 const logout = async () => {
   try { await api.post('/logout') } catch (e) {}
   localStorage.removeItem('user')
@@ -358,6 +363,17 @@ onUnmounted(() => {
 }
 
 .btn-logout:hover { background: #fee; }
+
+.btn-password {
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-password:hover { background: #f0f0f0; }
 
 /* Transición slide-down para panel admin */
 .slide-down-enter-active { transition: all 0.3s ease-out; }

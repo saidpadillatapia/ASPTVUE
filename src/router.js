@@ -6,6 +6,7 @@ import ChatView from './views/ChatView.vue'
 import NotificationsView from './views/NotificationsView.vue'
 import NotificationDetailView from './views/NotificationDetailView.vue'
 import UsersView from './views/UsersView.vue'
+import ChangePasswordView from './views/ChangePasswordView.vue'
 
 const routes = [
     {
@@ -46,6 +47,11 @@ const routes = [
         path: '/users',
         name: 'Users',
         component: UsersView,
+    },
+    {
+        path: '/change-password',
+        name: 'ChangePassword',
+        component: ChangePasswordView,
     },
 ]
 
