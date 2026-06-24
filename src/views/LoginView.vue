@@ -31,6 +31,9 @@
       <p class="register-link">
         ¿No tienes cuenta? <router-link to="/register">Regístrate aquí</router-link>
       </p>
+      <p class="register-link">
+        <router-link to="/forgot-password">¿Olvidaste tu contraseña?</router-link>
+      </p>
 
       <!-- Alerta de resultado -->
       <Transition name="slide-up">

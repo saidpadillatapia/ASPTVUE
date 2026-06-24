@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from './views/LoginView.vue'
 import RegisterView from './views/RegisterView.vue'
 import VerifyEmailView from './views/VerifyEmailView.vue'
+import ForgotPasswordView from './views/ForgotPasswordView.vue'
 import ChatView from './views/ChatView.vue'
 import NotificationsView from './views/NotificationsView.vue'
 import NotificationDetailView from './views/NotificationDetailView.vue'
@@ -27,6 +28,11 @@ const routes = [
         path: '/verify-email',
         name: 'VerifyEmail',
         component: VerifyEmailView,
+    },
+    {
+        path: '/forgot-password',
+        name: 'ForgotPassword',
+        component: ForgotPasswordView,
     },
     {
         path: '/chat',
@@ -63,7 +69,7 @@ const router = createRouter({
 // Guard: si no hay token, redirigir a login (excepto rutas públicas)
 router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
-    const publicRoutes = ['Login', 'Register', 'VerifyEmail']
+    const publicRoutes = ['Login', 'Register', 'VerifyEmail', 'ForgotPassword']
 
     if (!publicRoutes.includes(to.name) && !token) {
         next({ name: 'Login' })
