@@ -166,7 +166,12 @@ const resetPassword = async () => {
     showAlert('✓ ' + res.data.message, 'success')
     setTimeout(() => { router.push('/login') }, 2000)
   } catch (err) {
-    error.value = err.response?.data?.message || 'Error al cambiar contraseña'
+    if (err.response?.data?.errors) {
+      const firstError = Object.values(err.response.data.errors)[0]
+      error.value = Array.isArray(firstError) ? firstError[0] : firstError
+    } else {
+      error.value = err.response?.data?.message || 'Error al cambiar contraseña'
+    }
     showAlert('✗ ' + error.value, 'error')
   } finally {
     loading.value = false
